@@ -244,11 +244,8 @@ local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
 local isAimAssistOn = false
-local isPOVVisible = true
 local isAiming = false
-local isTriggerBOn = false
-local isESPToggleOn = false
-local aimKey = Enum.UserInputType.MouseButton2
+local aimKey = Enum.UserInputType.MouseButton2 -- Right-click to aim
 local aimCircleRadius = 100
 
 local screenGui = player:WaitForChild("PlayerGui"):FindFirstChild("AimAssistUI")
@@ -269,39 +266,6 @@ aimAssistToggleButton.Font = Enum.Font.SourceSans
 aimAssistToggleButton.TextSize = 18
 aimAssistToggleButton.Parent = screenGui
 
-local povToggleButton = Instance.new("TextButton")
-povToggleButton.Name = "POVToggleButton"
-povToggleButton.Size = UDim2.new(0, 100, 0, 50)
-povToggleButton.Position = UDim2.new(0, 120, 0, 10)
-povToggleButton.BackgroundColor3 = Color3.new(0, 1, 0)
-povToggleButton.Text = "POV: ON"
-povToggleButton.TextColor3 = Color3.new(1, 1, 1)
-povToggleButton.Font = Enum.Font.SourceSans
-povToggleButton.TextSize = 18
-povToggleButton.Parent = screenGui
-
-local triggerBToggleButton = Instance.new("TextButton")
-triggerBToggleButton.Name = "TriggerBToggleButton"
-triggerBToggleButton.Size = UDim2.new(0, 100, 0, 50)
-triggerBToggleButton.Position = UDim2.new(0, 230, 0, 10)
-triggerBToggleButton.BackgroundColor3 = Color3.new(1, 0, 0)
-triggerBToggleButton.Text = "TriggerB: OFF"
-triggerBToggleButton.TextColor3 = Color3.new(1, 1, 1)
-triggerBToggleButton.Font = Enum.Font.SourceSans
-triggerBToggleButton.TextSize = 18
-triggerBToggleButton.Parent = screenGui
-
-local espToggleButton = Instance.new("TextButton")
-espToggleButton.Name = "ESPToggleButton"
-espToggleButton.Size = UDim2.new(0, 100, 0, 50)
-espToggleButton.Position = UDim2.new(0, 340, 0, 10)
-espToggleButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red initially when off
-espToggleButton.Text = "ESP: OFF"
-espToggleButton.TextColor3 = Color3.new(1, 1, 1)
-espToggleButton.Font = Enum.Font.SourceSans
-espToggleButton.TextSize = 18
-espToggleButton.Parent = screenGui
-
 local aimCircle = Instance.new("Frame")
 aimCircle.Name = "AimCircle"
 aimCircle.Size = UDim2.new(0, aimCircleRadius * 2, 0, aimCircleRadius * 2)
@@ -312,8 +276,6 @@ aimCircle.BorderSizePixel = 2
 aimCircle.BorderColor3 = Color3.new(1, 1, 1)
 aimCircle.Visible = false
 aimCircle.Parent = screenGui
-
-local playerESPObjects = {}
 
 local function isPlayerVisible(targetPlayer)
     if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -358,71 +320,12 @@ local function aimAt(target)
     end
 end
 
-local function mouseClick()
-    -- Simulate left mouse button click
-    game:GetService("VirtualInputManager"):InputBegin(Enum.UserInputType.MouseButton1)
-    game:GetService("VirtualInputManager"):InputEnd(Enum.UserInputType.MouseButton1)
-end
-
-local function toggleTriggerB()
-    isTriggerBOn = not isTriggerBOn
-    triggerBToggleButton.Text = isTriggerBOn and "TriggerB: ON" or "TriggerB: OFF"
-    triggerBToggleButton.BackgroundColor3 = isTriggerBOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-end
-
-local function toggleESP()
-    isESPToggleOn = not isESPToggleOn
-    espToggleButton.Text = isESPToggleOn and "ESP: ON" or "ESP: OFF"
-    espToggleButton.BackgroundColor3 = isESPToggleOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local rootPart = targetPlayer.Character.HumanoidRootPart
-            if isESPToggleOn then
-                if not playerESPObjects[targetPlayer] then
-                    local billboardGui = Instance.new("BillboardGui")
-                    billboardGui.Adornee = rootPart
-                    billboardGui.Size = UDim2.new(0, 200, 0, 50)
-                    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
-                    billboardGui.AlwaysOnTop = true
-                    billboardGui.Parent = targetPlayer.Character
-
-                    local nameLabel = Instance.new("TextLabel")
-                    nameLabel.Text = targetPlayer.Name
-                    nameLabel.TextSize = 12
-                    nameLabel.TextColor3 = Color3.new(1, 0, 0)
-                    nameLabel.BackgroundTransparency = 1
-                    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-                    nameLabel.Parent = billboardGui
-
-                    playerESPObjects[targetPlayer] = billboardGui
-                end
-            else
-                if playerESPObjects[targetPlayer] then
-                    playerESPObjects[targetPlayer]:Destroy()
-                    playerESPObjects[targetPlayer] = nil
-                end
-            end
-        end
-    end
-end
-
 aimAssistToggleButton.MouseButton1Click:Connect(function()
     isAimAssistOn = not isAimAssistOn
     aimAssistToggleButton.Text = isAimAssistOn and "Aim Assist: ON" or "Aim Assist: OFF"
     aimAssistToggleButton.BackgroundColor3 = isAimAssistOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-    aimCircle.Visible = isAimAssistOn and isPOVVisible
+    aimCircle.Visible = isAimAssistOn
 end)
-
-povToggleButton.MouseButton1Click:Connect(function()
-    isPOVVisible = not isPOVVisible
-    povToggleButton.Text = isPOVVisible and "POV: ON" or "POV: OFF"
-    povToggleButton.BackgroundColor3 = isPOVVisible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-    aimCircle.Visible = isAimAssistOn and isPOVVisible
-end)
-
-triggerBToggleButton.MouseButton1Click:Connect(toggleTriggerB)
-espToggleButton.MouseButton1Click:Connect(toggleESP)
 
 UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == aimKey and isAimAssistOn then
@@ -437,30 +340,10 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 RunService.RenderStepped:Connect(function()
-    if isPOVVisible then
-        aimCircle.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
-    end
-
-    if isAiming and isAimAssistOn then
+    if isAimAssistOn and isAiming then
         local closestPlayer = getClosestPlayer()
         if closestPlayer then
             aimAt(closestPlayer)
-
-            if isTriggerBOn then
-                mouseClick()  -- Simulate left mouse button click
-            end
         end
     end
 end)
-
-game:GetService("Players").PlayerRemoving:Connect(function(leavingPlayer)
-    if leavingPlayer == player then
-        screenGui.Parent = player:WaitForChild("PlayerGui")
-    end
-end)
-
-player.CharacterAdded:Connect(function()
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-end)
-
-
