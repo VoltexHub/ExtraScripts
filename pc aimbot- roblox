@@ -1,0 +1,112 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+local isAimAssistOn = false
+local isAiming = false
+local aimKey = Enum.UserInputType.MouseButton2 -- Right-click to aim
+local aimCircleRadius = 100
+
+local screenGui = player:WaitForChild("PlayerGui"):FindFirstChild("AimAssistUI")
+if not screenGui then
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AimAssistUI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+end
+
+local aimAssistToggleButton = Instance.new("TextButton")
+aimAssistToggleButton.Name = "AimAssistToggleButton"
+aimAssistToggleButton.Size = UDim2.new(0, 100, 0, 50)
+aimAssistToggleButton.Position = UDim2.new(0, 10, 0, 10)
+aimAssistToggleButton.BackgroundColor3 = Color3.new(1, 0, 0)
+aimAssistToggleButton.Text = "Aim Assist: OFF"
+aimAssistToggleButton.TextColor3 = Color3.new(1, 1, 1)
+aimAssistToggleButton.Font = Enum.Font.SourceSans
+aimAssistToggleButton.TextSize = 18
+aimAssistToggleButton.Parent = screenGui
+
+local aimCircle = Instance.new("Frame")
+aimCircle.Name = "AimCircle"
+aimCircle.Size = UDim2.new(0, aimCircleRadius * 2, 0, aimCircleRadius * 2)
+aimCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+aimCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+aimCircle.BackgroundTransparency = 1
+aimCircle.BorderSizePixel = 2
+aimCircle.BorderColor3 = Color3.new(1, 1, 1)
+aimCircle.Visible = false
+aimCircle.Parent = screenGui
+
+local function isPlayerVisible(targetPlayer)
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPosition = targetPlayer.Character.HumanoidRootPart.Position
+        local cameraPosition = Camera.CFrame.Position
+        local ray = Ray.new(cameraPosition, (targetPosition - cameraPosition).unit * (targetPosition - cameraPosition).Magnitude)
+        local hitPart = workspace:FindPartOnRay(ray, player.Character, false, true)
+        return not hitPart or hitPart.Parent == targetPlayer.Character
+    end
+    return false
+end
+
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local closestDistance = aimCircleRadius
+    local cameraPosition = Camera.CFrame.Position
+    local cameraLookDirection = Camera.CFrame.LookVector
+
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = targetPlayer.Character.HumanoidRootPart
+            local screenPoint = Camera:WorldToViewportPoint(rootPart.Position)
+            local mousePosition = Vector2.new(mouse.X, mouse.Y)
+            local distance = (mousePosition - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+            local directionToPlayer = (rootPart.Position - cameraPosition).unit
+            local dotProduct = cameraLookDirection:Dot(directionToPlayer)
+            if distance <= aimCircleRadius and dotProduct > 0 and isPlayerVisible(targetPlayer) then
+                if not closestPlayer or distance < closestDistance then
+                    closestPlayer = targetPlayer
+                    closestDistance = distance
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function aimAt(target)
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = target.Character.HumanoidRootPart
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, rootPart.Position)
+    end
+end
+
+aimAssistToggleButton.MouseButton1Click:Connect(function()
+    isAimAssistOn = not isAimAssistOn
+    aimAssistToggleButton.Text = isAimAssistOn and "Aim Assist: ON" or "Aim Assist: OFF"
+    aimAssistToggleButton.BackgroundColor3 = isAimAssistOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+    aimCircle.Visible = isAimAssistOn
+end)
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == aimKey and isAimAssistOn then
+        isAiming = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == aimKey then
+        isAiming = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if isAimAssistOn and isAiming then
+        local closestPlayer = getClosestPlayer()
+        if closestPlayer then
+            aimAt(closestPlayer)
+        end
+    end
+end)
