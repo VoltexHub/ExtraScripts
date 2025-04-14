@@ -109,7 +109,7 @@ ModzSection:NewToggle("FlyGui", "", function(t)
 end)
 
 ModzSection:NewToggle("GodMode", "", function(t)
-    if t then print("no lol") end
+    if t then print("Enable godmode here") end
 end)
 
 local SettingTab = Window:NewTab("Settings")
