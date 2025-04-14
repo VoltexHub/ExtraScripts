@@ -1,234 +1,184 @@
--- raw script aimbot here (best for mobile)-:
+if getgenv().executed then return end
+getgenv().executed = true
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local mouse = player:GetMouse()
+local AimbotEnabled, TeammateCheck, WallCheck = false, false, true
+local FOV = 200
+local colourChosen = Color3.fromRGB(255, 255, 0)
 
-local isAimAssistOn = false
-local isTriggerBOn = false
-local isPOVVisible = true
-local isESPEnabled = false
-local aimKey = Enum.UserInputType.MouseButton2
-local aimCircleRadius = 100
-local lockOnRadius = 200  -- Increased radius for easier lock-on
-local smoothSpeed = 0.3  -- Quicker aiming speed for easier lock-on
+local Settings = {
+    HighlightESP = false,
+    NameESP = false,
+    BoxESP = false,
+    TracerESP = false,
+    HealthESP = false
+}
 
--- Create UI if it doesn't exist
-local screenGui = player:WaitForChild("PlayerGui"):FindFirstChild("AimAssistUI")
-if not screenGui then
-    screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "AimAssistUI"
-    screenGui.Parent = player:WaitForChild("PlayerGui")
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local AimbotSection = MainTab:NewSection("Aimbot")
+AimbotSection:NewToggle("Enable Aimbot", "", function(t) AimbotEnabled = t end)
+AimbotSection:NewToggle("Teammate Check", "", function(t) TeammateCheck = t end)
+AimbotSection:NewToggle("Wall Check", "", function(t) WallCheck = t end)
+
+local ESPSection = MainTab:NewSection("ESP")
+ESPSection:NewToggle("Highlight", "", function(t) Settings.HighlightESP = t end)
+ESPSection:NewToggle("Name", "", function(t) Settings.NameESP = t end)
+ESPSection:NewToggle("Boxes", "", function(t) Settings.BoxESP = t end)
+ESPSection:NewToggle("Tracers", "", function(t) Settings.TracerESP = t end)
+ESPSection:NewToggle("Healthbar", "", function(t) Settings.HealthESP = t end)
+
+local function IsTeammate(p)
+    if not LocalPlayer.Team or not p.Team then return false end
+    return p.Team == LocalPlayer.Team
 end
 
--- Aim Circle UI
-local aimCircle = Instance.new("Frame")
-aimCircle.Name = "AimCircle"
-aimCircle.Size = UDim2.new(0, aimCircleRadius * 2, 0, aimCircleRadius * 2)
-aimCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-aimCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-aimCircle.BackgroundTransparency = 1
-aimCircle.BorderSizePixel = 2
-aimCircle.BorderColor3 = Color3.new(1, 1, 1)
-aimCircle.Visible = false
-aimCircle.Parent = screenGui
-
-local playerESPObjects = {}
-
--- Check if a player is visible only when aiming
-local function isPlayerVisible(targetPlayer)
-    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local targetPosition = targetPlayer.Character.HumanoidRootPart.Position
-        local cameraPosition = Camera.CFrame.Position
-        local ray = Ray.new(cameraPosition, (targetPosition - cameraPosition).unit * (targetPosition - cameraPosition).Magnitude)
-        local hitPart = workspace:FindPartOnRay(ray, player.Character, false, true)
-        return not hitPart or hitPart.Parent == targetPlayer.Character
-    end
-    return false
+local function IsVisible(part)
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+    local result = workspace:Raycast(origin, direction, rayParams)
+    return result and result.Instance:IsDescendantOf(part.Parent)
 end
 
--- Stronger aimbot (easier lock-on, quicker aim)
-local function smoothAimAt(target)
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local targetPosition = target.Character.HumanoidRootPart.Position
-        local cameraPosition = Camera.CFrame.Position
-        local directionToTarget = (targetPosition - cameraPosition).unit
-        local newCFrame = Camera.CFrame:Lerp(CFrame.new(cameraPosition, cameraPosition + directionToTarget), smoothSpeed)
-        Camera.CFrame = newCFrame
-    end
-end
-
-local function getClosestPlayer()
-    local closestPlayer = nil
-    local closestDistance = lockOnRadius
-    local cameraPosition = Camera.CFrame.Position
-    local cameraLookDirection = Camera.CFrame.LookVector
-
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local rootPart = targetPlayer.Character.HumanoidRootPart
-            local screenPoint = Camera:WorldToViewportPoint(rootPart.Position)
-            local mousePosition = Vector2.new(mouse.X, mouse.Y)
-            local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mousePosition).Magnitude
-            local directionToPlayer = (rootPart.Position - cameraPosition).unit
-            local dotProduct = cameraLookDirection:Dot(directionToPlayer)
-
-            -- Lock on if within aim circle and visible
-            if distance <= aimCircleRadius and dotProduct > 0 and isPlayerVisible(targetPlayer) then
-                local playerDistance = (cameraPosition - rootPart.Position).Magnitude
-                if playerDistance < closestDistance then
-                    closestPlayer = targetPlayer
-                    closestDistance = playerDistance
-                end
+local function GetClosestPlayer()
+    local closest, shortest = nil, FOV
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+            if TeammateCheck and IsTeammate(p) then continue end
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if not onScreen then continue end
+            if WallCheck and not IsVisible(p.Character.HumanoidRootPart) then continue end
+            local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+            if dist < shortest then
+                shortest = dist
+                closest = p
             end
         end
     end
-    return closestPlayer
+    return closest
 end
-
-local function mouseClick()
-    -- Trigger bot: Simulate a mouse click (automatic fire)
-    game:GetService("VirtualInputManager"):InputBegin(Enum.UserInputType.MouseButton1)
-    game:GetService("VirtualInputManager"):InputEnd(Enum.UserInputType.MouseButton1)
-end
-
-local function toggleTriggerB()
-    isTriggerBOn = not isTriggerBOn
-end
-
-local function toggleESP()
-    isESPEnabled = not isESPEnabled
-    -- Toggle ESP visibility
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local rootPart = targetPlayer.Character.HumanoidRootPart
-            if not playerESPObjects[targetPlayer] and isESPEnabled then
-                local billboardGui = Instance.new("BillboardGui")
-                billboardGui.Adornee = rootPart
-                billboardGui.Size = UDim2.new(0, 200, 0, 50)
-                billboardGui.StudsOffset = Vector3.new(0, 3, 0)
-                billboardGui.AlwaysOnTop = true
-                billboardGui.Parent = targetPlayer.Character
-
-                local nameLabel = Instance.new("TextLabel")
-                nameLabel.Text = targetPlayer.Name
-                nameLabel.TextSize = 12
-                nameLabel.TextColor3 = Color3.new(1, 0, 0)
-                nameLabel.BackgroundTransparency = 1
-                nameLabel.Size = UDim2.new(1, 0, 1, 0)
-                nameLabel.Parent = billboardGui
-
-                playerESPObjects[targetPlayer] = billboardGui
-            elseif playerESPObjects[targetPlayer] and not isESPEnabled then
-                playerESPObjects[targetPlayer]:Destroy()
-                playerESPObjects[targetPlayer] = nil
-            end
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input)
-    if input.UserInputType == aimKey then
-        isAimAssistOn = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == aimKey then
-        isAimAssistOn = false
-    end
-end)
 
 RunService.RenderStepped:Connect(function()
-    if isPOVVisible then
-        aimCircle.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
-    end
-
-    if isAimAssistOn then
-        local closestPlayer = getClosestPlayer()
-        if closestPlayer then
-            -- Aim strongly and trigger fire when locked
-            smoothAimAt(closestPlayer)
-
-            if isTriggerBOn then
-                -- Trigger Bot: Fire automatically when locked onto target
-                mouseClick()
-            end
+    if AimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
         end
     end
 end)
 
--- UI buttons with your features
+-- ESP System
+local Drawings = {}
+local function removeESP(p)
+    if Drawings[p] then
+        for _, obj in pairs(Drawings[p]) do
+            if typeof(obj) == "Instance" then obj:Destroy() else obj:Remove() end
+        end
+        Drawings[p] = nil
+    end
+end
 
-local aimAssistToggleButton = Instance.new("TextButton")
-aimAssistToggleButton.Name = "AimAssistToggleButton"
-aimAssistToggleButton.Size = UDim2.new(0, 100, 0, 50)
-aimAssistToggleButton.Position = UDim2.new(0, 10, 0, 10)
-aimAssistToggleButton.BackgroundColor3 = Color3.new(1, 0, 0)
-aimAssistToggleButton.Text = "Aim Assist: OFF"
-aimAssistToggleButton.TextColor3 = Color3.new(1, 1, 1)
-aimAssistToggleButton.Font = Enum.Font.SourceSans
-aimAssistToggleButton.TextSize = 18
-aimAssistToggleButton.Parent = screenGui
+local function createESP(p)
+    if Drawings[p] then return end
+    Drawings[p] = {
+        Box = Drawing.new("Square"),
+        Tracer = Drawing.new("Line"),
+        Health = Drawing.new("Line")
+    }
 
-local povToggleButton = Instance.new("TextButton")
-povToggleButton.Name = "POVToggleButton"
-povToggleButton.Size = UDim2.new(0, 100, 0, 50)
-povToggleButton.Position = UDim2.new(0, 120, 0, 10)
-povToggleButton.BackgroundColor3 = Color3.new(0, 1, 0)
-povToggleButton.Text = "POV: ON"
-povToggleButton.TextColor3 = Color3.new(1, 1, 1)
-povToggleButton.Font = Enum.Font.SourceSans
-povToggleButton.TextSize = 18
-povToggleButton.Parent = screenGui
+    for _, d in pairs(Drawings[p]) do
+        d.Thickness = 1
+        d.Visible = false
+    end
 
-local triggerBToggleButton = Instance.new("TextButton")
-triggerBToggleButton.Name = "TriggerBToggleButton"
-triggerBToggleButton.Size = UDim2.new(0, 100, 0, 50)
-triggerBToggleButton.Position = UDim2.new(0, 230, 0, 10)
-triggerBToggleButton.BackgroundColor3 = Color3.new(1, 0, 0)
-triggerBToggleButton.Text = "TriggerB: OFF"
-triggerBToggleButton.TextColor3 = Color3.new(1, 1, 1)
-triggerBToggleButton.Font = Enum.Font.SourceSans
-triggerBToggleButton.TextSize = 18
-triggerBToggleButton.Parent = screenGui
+    if Settings.NameESP then
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "NameESP"
+        gui.Size = UDim2.new(0, 200, 0, 50)
+        gui.StudsOffset = Vector3.new(0, 2, 0)
+        gui.AlwaysOnTop = true
+        local label = Instance.new("TextLabel", gui)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextStrokeTransparency = 0.5
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextSize = 14
+        label.Text = p.Name
+        Drawings[p].Name = gui
+    end
 
-local espToggleButton = Instance.new("TextButton")
-espToggleButton.Name = "ESPToggleButton"
-espToggleButton.Size = UDim2.new(0, 100, 0, 50)
-espToggleButton.Position = UDim2.new(0, 340, 0, 10)
-espToggleButton.BackgroundColor3 = Color3.new(1, 0, 0)
-espToggleButton.Text = "ESP: OFF"
-espToggleButton.TextColor3 = Color3.new(1, 1, 1)
-espToggleButton.Font = Enum.Font.SourceSans
-espToggleButton.TextSize = 18
-espToggleButton.Parent = screenGui
+    if Settings.HighlightESP and p.Character then
+        local h = Instance.new("Highlight")
+        h.Name = "Highlight"
+        h.Adornee = p.Character
+        h.FillColor = colourChosen
+        h.FillTransparency = 0.5
+        h.OutlineColor = Color3.fromRGB(255, 255, 255)
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = p.Character:FindFirstChild("HumanoidRootPart") or p.Character
+    end
+end
 
--- Toggle functionalities
-aimAssistToggleButton.MouseButton1Click:Connect(function()
-    isAimAssistOn = not isAimAssistOn
-    aimAssistToggleButton.Text = isAimAssistOn and "Aim Assist: ON" or "Aim Assist: OFF"
-    aimAssistToggleButton.BackgroundColor3 = isAimAssistOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+RunService.RenderStepped:Connect(function()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+            createESP(p)
+            local root = p.Character.HumanoidRootPart
+            local hum = p.Character.Humanoid
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local scale = 1 / (root.Position - Camera.CFrame.Position).Magnitude * 100
+            local size = Vector2.new(2.5, 3.8) * scale * 100
+            local tl = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+            local br = Vector2.new(pos.X + size.X / 2, pos.Y + size.Y / 2)
+            local color = IsTeammate(p) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+
+            if Drawings[p] then
+                if Settings.BoxESP then
+                    local box = Drawings[p].Box
+                    box.Position = tl
+                    box.Size = size
+                    box.Color = color
+                    box.Visible = onScreen
+                else Drawings[p].Box.Visible = false end
+
+                if Settings.TracerESP then
+                    local line = Drawings[p].Tracer
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(pos.X, pos.Y)
+                    line.Color = color
+                    line.Visible = onScreen
+                else Drawings[p].Tracer.Visible = false end
+
+                if Settings.HealthESP then
+                    local hp = hum.Health / hum.MaxHealth
+                    local bar = Drawings[p].Health
+                    bar.From = Vector2.new(tl.X - 2, br.Y)
+                    bar.To = Vector2.new(tl.X - 2, tl.Y + (br.Y - tl.Y) * (1 - hp))
+                    bar.Color = Color3.fromRGB(0, 255, 0)
+                    bar.Visible = onScreen
+                else Drawings[p].Health.Visible = false end
+
+                if Settings.NameESP and Drawings[p].Name then
+                    Drawings[p].Name.Adornee = root
+                    Drawings[p].Name.Parent = root
+                elseif Drawings[p].Name then
+                    Drawings[p].Name:Destroy()
+                end
+            end
+        else
+            removeESP(p)
+        end
+    end
 end)
 
-povToggleButton.MouseButton1Click:Connect(function()
-    isPOVVisible = not isPOVVisible
-    povToggleButton.Text = isPOVVisible and "POV: ON" or "POV: OFF"
-    povToggleButton.BackgroundColor3 = isPOVVisible and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-end)
-
-triggerBToggleButton.MouseButton1Click:Connect(function()
-    isTriggerBOn = not isTriggerBOn
-    triggerBToggleButton.Text = isTriggerBOn and "TriggerB: ON" or "TriggerB: OFF"
-    triggerBToggleButton.BackgroundColor3 = isTriggerBOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-end)
-
-espToggleButton.MouseButton1Click:Connect(function()
-    toggleESP()
-    espToggleButton.Text = isESPEnabled and "ESP: ON" or "ESP: OFF"
-    espToggleButton.BackgroundColor3 = isESPEnabled and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-end)
+Players.PlayerRemoving:Connect(removeESP)
