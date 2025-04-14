@@ -1,0 +1,205 @@
+-- this script isnt that good, but wtv. Please dont skid!
+
+if getgenv().executed then return end
+getgenv().executed = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local AimbotEnabled, TeammateCheck, WallCheck, Holding = false, false, true, false
+local FOV = 200
+local ToggleKey = Enum.KeyCode.RightShift
+local UIVisible = true
+
+local Settings = {
+    HighlightESP = false,
+    NameESP = false,
+    BoxESP = false,
+    TracerESP = false,
+    HealthESP = false
+}
+
+local colourChosen = Color3.fromRGB(255, 255, 0)
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local AimbotSection = MainTab:NewSection("Aimbot")
+AimbotSection:NewToggle("Enable Aimbot", "", function(t) AimbotEnabled = t end)
+AimbotSection:NewToggle("Teammate Check", "", function(t) TeammateCheck = t end)
+AimbotSection:NewToggle("Wall Check", "", function(t) WallCheck = t end)
+
+local ESPSection = MainTab:NewSection("ESP")
+ESPSection:NewToggle("Highlight", "", function(t) Settings.HighlightESP = t end)
+ESPSection:NewToggle("Name", "", function(t) Settings.NameESP = t end)
+ESPSection:NewToggle("Boxes", "", function(t) Settings.BoxESP = t end)
+ESPSection:NewToggle("Tracers", "", function(t) Settings.TracerESP = t end)
+ESPSection:NewToggle("Healthbar", "", function(t) Settings.HealthESP = t end)
+
+local SettingTab = Window:NewTab("Settings")
+local SettingSection = SettingTab:NewSection("UI Options")
+SettingSection:NewTextBox("Toggle Key", "1 letter (ex: Z)", function(txt)
+    local key = txt:upper():sub(1, 1)
+    local found = Enum.KeyCode[key]
+    if found then ToggleKey = found end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then Holding = true end
+    if input.KeyCode == ToggleKey then
+        UIVisible = not UIVisible
+        game:GetService("CoreGui"):FindFirstChild("KavoUI").Enabled = UIVisible
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then Holding = false end
+end)
+
+local function IsTeammate(p) return p.Team == LocalPlayer.Team end
+local function IsVisible(part)
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin).Unit * 1000
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result and result.Instance:IsDescendantOf(part.Parent)
+end
+
+local function GetClosestPlayer()
+    local closest, shortest = nil, FOV
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            if TeammateCheck and IsTeammate(p) then continue end
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if not onScreen then continue end
+            local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+            if dist < shortest then
+                if WallCheck and not IsVisible(p.Character.HumanoidRootPart) then continue end
+                shortest, closest = dist, p
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled and Holding then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+        end
+    end
+end)
+
+-- ESP Drawing
+local Drawings = {}
+local function removeESP(p)
+    if Drawings[p] then
+        for _, obj in pairs(Drawings[p]) do
+            if typeof(obj) == "Instance" then obj:Destroy() else obj:Remove() end
+        end
+        Drawings[p] = nil
+    end
+end
+
+local function createESP(p)
+    if Drawings[p] then return end
+    Drawings[p] = {
+        Box = Drawing.new("Square"),
+        Tracer = Drawing.new("Line"),
+        Health = Drawing.new("Line")
+    }
+
+    for _, d in pairs(Drawings[p]) do
+        d.Thickness = 1
+        d.Visible = false
+    end
+
+    if Settings.NameESP then
+        local gui = Instance.new("BillboardGui")
+        gui.Name = "NameESP"
+        gui.Size = UDim2.new(0, 200, 0, 50)
+        gui.StudsOffset = Vector3.new(0, 2, 0)
+        gui.AlwaysOnTop = true
+        local label = Instance.new("TextLabel", gui)
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextStrokeTransparency = 0.5
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextSize = 14
+        label.Text = p.Name
+        Drawings[p].Name = gui
+    end
+
+    if Settings.HighlightESP and p.Character then
+        local h = Instance.new("Highlight")
+        h.Name = "Highlight"
+        h.Adornee = p.Character
+        h.FillColor = colourChosen
+        h.FillTransparency = 0.5
+        h.OutlineColor = Color3.fromRGB(255, 255, 255)
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = p.Character:FindFirstChild("HumanoidRootPart") or p.Character
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+            createESP(p)
+            local root = p.Character.HumanoidRootPart
+            local hum = p.Character.Humanoid
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            local scale = 1 / (root.Position - Camera.CFrame.Position).Magnitude * 100
+            local size = Vector2.new(2.5, 3.8) * scale * 100
+            local tl = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+            local br = Vector2.new(pos.X + size.X / 2, pos.Y + size.Y / 2)
+            local color = IsTeammate(p) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+
+            if Drawings[p] then
+                if Settings.BoxESP then
+                    local box = Drawings[p].Box
+                    box.Position = tl
+                    box.Size = size
+                    box.Color = color
+                    box.Visible = onScreen
+                else Drawings[p].Box.Visible = false end
+
+                if Settings.TracerESP then
+                    local line = Drawings[p].Tracer
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(pos.X, pos.Y)
+                    line.Color = color
+                    line.Visible = onScreen
+                else Drawings[p].Tracer.Visible = false end
+
+                if Settings.HealthESP then
+                    local hp = hum.Health / hum.MaxHealth
+                    local bar = Drawings[p].Health
+                    bar.From = Vector2.new(tl.X - 2, br.Y)
+                    bar.To = Vector2.new(tl.X - 2, tl.Y + (br.Y - tl.Y) * (1 - hp))
+                    bar.Color = Color3.fromRGB(0, 255, 0)
+                    bar.Visible = onScreen
+                else Drawings[p].Health.Visible = false end
+
+                if Settings.NameESP and Drawings[p].Name then
+                    Drawings[p].Name.Adornee = root
+                    Drawings[p].Name.Parent = root
+                elseif Drawings[p].Name then
+                    Drawings[p].Name:Destroy()
+                end
+            end
+        else
+            removeESP(p)
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(removeESP)
