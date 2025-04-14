@@ -2,7 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
  
--- GUI Setup
+-- GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
  
@@ -35,7 +35,7 @@ startButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
 startButton.BorderSizePixel = 0
 startButton.Parent = frame
  
--- Destroy UI Button
+-- Destroy UI
 local destroyButton = Instance.new("TextButton")
 destroyButton.Size = UDim2.new(1, 0, 0.5, 0)
 destroyButton.Position = UDim2.new(0, 0, 0.5, 0) -- Below the username box and start button
@@ -47,7 +47,6 @@ destroyButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
 destroyButton.BorderSizePixel = 0
 destroyButton.Parent = frame
  
--- Variables
 local movementDistance = 2
 local speed = 20
 local moving = false
@@ -55,7 +54,7 @@ local targetPlayer = nil
 local moveDirection = 1
 local lastTargetPosition = nil
  
--- Function to find player by username or display name
+-- find user/display
 local function findPlayer(name)
     for _, player in ipairs(Players:GetPlayers()) do
         if player.Name:lower() == name:lower() or player.DisplayName:lower() == name:lower() then
@@ -65,7 +64,7 @@ local function findPlayer(name)
     return nil
 end
  
--- Start Button Functionality
+-- Start
 startButton.MouseButton1Click:Connect(function()
     targetPlayer = findPlayer(usernameBox.Text)
     moving = targetPlayer ~= nil
@@ -76,13 +75,11 @@ startButton.MouseButton1Click:Connect(function()
     end
 end)
  
--- Destroy Button Functionality
 destroyButton.MouseButton1Click:Connect(function()
     screenGui:Destroy() -- Destroy the entire UI
     print("UI destroyed.")
 end)
  
--- Main Loop
 RunService.Heartbeat:Connect(function(deltaTime)
     if moving and targetPlayer then
         local localPlayer = Players.LocalPlayer
