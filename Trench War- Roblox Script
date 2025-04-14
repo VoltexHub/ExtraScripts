@@ -7,18 +7,124 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-local AimbotEnabled = false
-local TeammateCheck = false
-local WallCheck = true
-local Holding = false
+local AimbotEnabled, TeammateCheck, WallCheck, Holding, AutoClickerEnabled, TriggerBot = false, false, true, false, false, false
 local FOV = 200
-local FlyGuiEnabled = false
 local ToggleKey = Enum.KeyCode.RightShift
-local UIVisible = true
-local HitboxEnabled = false
+local AutoClickerKey = Enum.KeyCode.X
+local AutoClickerSpeed = 50
+local UIVisible, FlyGuiEnabled, HitboxEnabled = true, false, false
 local HitboxConnection
 _G.ESPToggle = false
+_G.NameESP = false
 local colourChosen = Color3.fromRGB(255, 255, 0)
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("Weapons")
+MainSection:NewDropdown("Select Weapon", "Choose a weapon to equip", {"Machine Gun", "Mortar", "Sniper"}, function(selected)
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local weaponFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons")
+    if backpack and weaponFolder then
+        local weapon = weaponFolder:FindFirstChild(selected)
+        if weapon then
+            weapon:Clone().Parent = backpack
+        end
+    end
+end)
+
+MainSection:NewToggle("Auto Equip", "", function(t) AutoEquipEnabled = t end)
+
+local AimbotSection = MainTab:NewSection("Aimbot")
+AimbotSection:NewToggle("Enable Aimbot", "", function(t) AimbotEnabled = t end)
+AimbotSection:NewToggle("Teammate Check", "", function(t) TeammateCheck = t end)
+AimbotSection:NewToggle("Wall Check", "", function(t) WallCheck = t end)
+AimbotSection:NewToggle("TriggerBot", "", function(t) TriggerBot = t end)
+
+local ESPSection = MainTab:NewSection("ESP")
+ESPSection:NewToggle("Name", "", function(t) _G.NameESP = t end)
+ESPSection:NewToggle("Boxes", "", function(t) end)
+ESPSection:NewToggle("Health", "", function(t) end)
+ESPSection:NewToggle("Tracers", "", function(t) end)
+ESPSection:NewToggle("Highlight", "", function(t) _G.ESPToggle = t end)
+
+local GeneralSection = MainTab:NewSection("General PVP")
+GeneralSection:NewToggle("HitBox Expander", "", function(t)
+    HitboxEnabled = t
+    if t then
+        _G.HeadSize = 20
+        _G.Disabled = false
+        HitboxConnection = RunService.RenderStepped:Connect(function()
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function()
+                        local hrp = v.Character.HumanoidRootPart
+                        hrp.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
+                        hrp.Transparency = 0.7
+                        hrp.BrickColor = BrickColor.new("Really black")
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
+                    end)
+                end
+            end
+        end)
+    else
+        if HitboxConnection then HitboxConnection:Disconnect() end
+        HitboxConnection = nil
+        _G.Disabled = true
+    end
+end)
+
+GeneralSection:NewSlider("HitBox Size", "", 10, 50, function(t) _G.HeadSize = t end)
+GeneralSection:NewToggle("AutoClicker", "Toggles AutoClicker on/off", function(t) AutoClickerEnabled = t end)
+GeneralSection:NewSlider("AutoClicker Speed (ms)", "Speed of AutoClicker", 5, 50, function(t) AutoClickerSpeed = t end)
+
+local TPSection = MainTab:NewSection("Teleports")
+TPSection:NewToggle("Teleport to Allies", "", function(t)
+    if t then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char:MoveTo(Vector3.new(0.248, 103.199, 764.349))
+        end
+    end
+end)
+
+TPSection:NewToggle("Teleport to Axis", "", function(t)
+    if t then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char:MoveTo(Vector3.new(-0.636, 103.199, -766.429))
+        end
+    end
+end)
+
+local ModzTab = Window:NewTab("Modz")
+local ModzSection = ModzTab:NewSection("Utilities")
+ModzSection:NewToggle("FlyGui", "", function(t)
+    if t and not FlyGuiEnabled then
+        FlyGuiEnabled = true
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+    end
+end)
+
+ModzSection:NewToggle("GodMode", "", function(t)
+    if t then print("no lol") end
+end)
+
+local SettingTab = Window:NewTab("Settings")
+local SettingSection = SettingTab:NewSection("UI Options")
+SettingSection:NewTextBox("Toggle Key", "1 character only (ex: Z)", function(txt)
+    local key = txt:upper():sub(1, 1)
+    local foundKey = Enum.KeyCode[key]
+    if foundKey then ToggleKey = foundKey end
+end)
+
+SettingSection:NewTextBox("AutoClicker Key", "1 character only (ex: X)", function(txt)
+    local key = txt:upper():sub(1, 1)
+    local foundKey = Enum.KeyCode[key]
+    if foundKey then AutoClickerKey = foundKey end
+end)
 
 local function IsTeammate(player)
     return player.Team == LocalPlayer.Team
@@ -60,242 +166,129 @@ RunService.RenderStepped:Connect(function()
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
         end
     end
+    if AutoClickerEnabled then
+        mouse1click()
+        wait(AutoClickerSpeed / 1000)
+    end
+end)
+
+local mouse = LocalPlayer:GetMouse()
+RunService.RenderStepped:Connect(function()
+    if TriggerBot and mouse.Target then
+        local target = mouse.Target
+        local char = target:FindFirstAncestorOfClass("Model")
+        if char and Players:GetPlayerFromCharacter(char) and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+            if not TeammateCheck or not IsTeammate(Players:GetPlayerFromCharacter(char)) then
+                mouse1click()
+            end
+        end
+    end
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Holding = true
-    elseif input.KeyCode == ToggleKey then
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then Holding = true end
+    if input.KeyCode == ToggleKey then
         UIVisible = not UIVisible
         game:GetService("CoreGui"):FindFirstChild("KavoUI").Enabled = UIVisible
+    end
+    if input.KeyCode == AutoClickerKey then
+        AutoClickerEnabled = not AutoClickerEnabled
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Holding = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then Holding = false end
 end)
 
--- GUI
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
-
--- Main Tab
-local MainTab = Window:NewTab("Main")
-local MainSection = MainTab:NewSection("Weapons")
-
-MainSection:NewDropdown("Select Weapon", "Choose a weapon to equip", {"Machine Gun", "Mortar", "Sniper"}, function(selected)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    local weaponFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons")
-    if backpack and weaponFolder then
-        local weapon = weaponFolder:FindFirstChild(selected)
-        if weapon then
-            weapon:Clone().Parent = backpack
-        end
-    end
-end)
-
--- Aimbot Section (inside Main now)
-local AimbotSection = MainTab:NewSection("Aimbot")
-
-AimbotSection:NewToggle("Enable Aimbot", "", function(t)
-    AimbotEnabled = t
-end)
-
-AimbotSection:NewToggle("Teammate Check", "", function(t)
-    TeammateCheck = t
-end)
-
-AimbotSection:NewToggle("Wall Check", "", function(t)
-    WallCheck = t
-end)
-
--- ESP Section
-local ESPSection = MainTab:NewSection("ESP")
-
-ESPSection:NewToggle("Name", "", function(t)
-    _G.NameESP = t
-end)
-
-ESPSection:NewToggle("Health", "", function(t) end)
-ESPSection:NewToggle("Boxes", "", function(t) end)
-ESPSection:NewToggle("Tracers", "", function(t) end)
-
-ESPSection:NewToggle("Highlight", "", function(t)
-    _G.ESPToggle = t
-end)
-
--- Modz Tab
-local ModzTab = Window:NewTab("Modz")
-local ModzSection = ModzTab:NewSection("Utilities")
-
-ModzSection:NewToggle("HitBox Expander", "", function(t)
-    if t then
-        HitboxEnabled = true
-        _G.HeadSize = 20
-        _G.Disabled = false
-        HitboxConnection = RunService.RenderStepped:Connect(function()
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-                    pcall(function()
-                        v.Character.HumanoidRootPart.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
-                        v.Character.HumanoidRootPart.Transparency = 0.7
-                        v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black")
-                        v.Character.HumanoidRootPart.Material = Enum.Material.Neon
-                        v.Character.HumanoidRootPart.CanCollide = false
-                    end)
-                end
-            end
-        end)
-    else
-        if HitboxConnection then
-            HitboxConnection:Disconnect()
-            HitboxConnection = nil
-        end
-        _G.Disabled = true
-    end
-end)
-
-ModzSection:NewToggle("FlyGui", "", function(t)
-    if t and not FlyGuiEnabled then
-        FlyGuiEnabled = true
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
-    end
-end)
-
-ModzSection:NewToggle("GodMode", "", function(t)
-    if t then
-        print("Enable godmode here")
-    end
-end)
-
--- Settings Tab
-local SettingTab = Window:NewTab("Settings")
-local SettingSection = SettingTab:NewSection("UI Options")
-
-SettingSection:NewTextBox("Toggle Key", "1 character only (ex: Z)", function(txt)
-    local key = txt:upper():sub(1, 1)
-    local foundKey = Enum.KeyCode[key]
-    if foundKey then
-        ToggleKey = foundKey
-    end
-end)
-
--- Highlight ESP logic
+-- ESP: Highlight
 local function getCharacter(player)
     return workspace:FindFirstChild(player.Name)
 end
 
 local function addHighlightToCharacter(player, character)
     if player == LocalPlayer then return end
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart and not humanoidRootPart:FindFirstChild("Highlight") then
-        local highlightClone = Instance.new("Highlight")
-        highlightClone.Name = "Highlight"
-        highlightClone.Adornee = character
-        highlightClone.Parent = humanoidRootPart
-        highlightClone.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlightClone.FillColor = colourChosen
-        highlightClone.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlightClone.FillTransparency = 0.5
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root and not root:FindFirstChild("Highlight") then
+        local h = Instance.new("Highlight")
+        h.Name = "Highlight"
+        h.Adornee = character
+        h.Parent = root
+        h.FillColor = colourChosen
+        h.OutlineColor = Color3.fromRGB(255, 255, 255)
+        h.FillTransparency = 0.5
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     end
 end
 
 local function removeHighlightFromCharacter(character)
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        local highlightInstance = humanoidRootPart:FindFirstChild("Highlight")
-        if highlightInstance then
-            highlightInstance:Destroy()
-        end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root then
+        local h = root:FindFirstChild("Highlight")
+        if h then h:Destroy() end
     end
 end
 
-local function updateHighlights()
-    for _, player in pairs(Players:GetPlayers()) do
-        local character = getCharacter(player)
-        if character then
-            if _G.ESPToggle then
-                addHighlightToCharacter(player, character)
-            else
-                removeHighlightFromCharacter(character)
-            end
+RunService.RenderStepped:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        local char = getCharacter(p)
+        if char then
+            if _G.ESPToggle then addHighlightToCharacter(p, char)
+            else removeHighlightFromCharacter(char) end
         end
     end
-end
+end)
 
-RunService.RenderStepped:Connect(updateHighlights)
-
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function(character)
-        if _G.ESPToggle then
-            addHighlightToCharacter(player, character)
-        end
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(c)
+        if _G.ESPToggle then addHighlightToCharacter(p, c) end
     end)
 end)
 
-Players.PlayerRemoving:Connect(function(playerRemoved)
-    local character = playerRemoved.Character
-    if character then
-        removeHighlightFromCharacter(character)
-    end
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character then removeHighlightFromCharacter(p.Character) end
 end)
 
--- Name ESP
 local function addNameESP(player)
     if not player.Character or player == LocalPlayer then return end
-    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        local billboardGui = Instance.new("BillboardGui")
-        billboardGui.Adornee = humanoidRootPart
-        billboardGui.Size = UDim2.new(0, 200, 0, 50)
-        billboardGui.StudsOffset = Vector3.new(0, 2, 0)
-        billboardGui.Parent = humanoidRootPart
+    local root = player.Character:FindFirstChild("HumanoidRootPart")
+    if root and not root:FindFirstChildOfClass("BillboardGui") then
+        local gui = Instance.new("BillboardGui", root)
+        gui.Adornee = root
+        gui.Size = UDim2.new(0, 200, 0, 50)
+        gui.StudsOffset = Vector3.new(0, 2, 0)
 
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = player.Name
-        nameLabel.Size = UDim2.new(1, 0, 1, 0)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        nameLabel.TextStrokeTransparency = 0.5
-        nameLabel.TextSize = 16
-        nameLabel.Parent = billboardGui
+        local label = Instance.new("TextLabel", gui)
+        label.Text = player.Name
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextStrokeTransparency = 0.5
+        label.TextSize = 16
     end
 end
 
 local function removeNameESP(player)
     if player.Character then
-        local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local billboardGui = humanoidRootPart:FindFirstChildOfClass("BillboardGui")
-            if billboardGui then
-                billboardGui:Destroy()
-            end
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local gui = root:FindFirstChildOfClass("BillboardGui")
+            if gui then gui:Destroy() end
         end
     end
 end
 
--- Enable/Disable Name ESP based on toggle
 RunService.RenderStepped:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        if _G.NameESP then
-            addNameESP(player)
-        else
-            removeNameESP(player)
-        end
+    for _, p in pairs(Players:GetPlayers()) do
+        if _G.NameESP then addNameESP(p)
+        else removeNameESP(p) end
     end
 end)
 
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        if _G.NameESP then
-            addNameESP(player)
-        end
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        if _G.NameESP then addNameESP(p) end
     end)
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-    removeNameESP(player)
-end)
+Players.PlayerRemoving:Connect(function(p) removeNameESP(p) end)
