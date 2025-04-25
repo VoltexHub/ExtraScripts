@@ -1,0 +1,24 @@
+local webhookUrl = "link"
+
+local data = {
+    ["content"] = "Hello from Roblox Lua script!",
+    ["username"] = "WebhookBot" -- optional
+}
+
+local jsonData = game:GetService("HttpService"):JSONEncode(data)
+
+local requestData = {
+    Url = webhookUrl,
+    Method = "POST",
+    Headers = {
+        ["Content-Type"] = "application/json"
+    },
+    Body = jsonData
+}
+
+local http_request = http and http.request or syn and syn.request or http_request
+if http_request then
+    http_request(requestData)
+else
+    warn("Your executor does not support HTTP requests.")
+end
