@@ -1,3 +1,5 @@
+-- aimbot doesnt work
+
 if getgenv().executed then return end
 getgenv().executed = true
 
@@ -12,7 +14,7 @@ local FOV = 200
 local ToggleKey = Enum.KeyCode.RightShift
 local AutoClickerKey = Enum.KeyCode.X
 local AutoClickerSpeed = 50
-local UIVisible, FlyGuiEnabled, HitboxEnabled = true, false, false
+local UIVisible, FlyGuiEnabled, HitboxEnabled, GodModeEnabled = true, false, false, false
 local HitboxConnection
 _G.ESPToggle = false
 _G.NameESP = false
@@ -21,8 +23,10 @@ local colourChosen = Color3.fromRGB(255, 255, 0)
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
 
+--// Gui
 local MainTab = Window:NewTab("Main")
 local MainSection = MainTab:NewSection("Weapons")
+
 MainSection:NewDropdown("Select Weapon", "Choose a weapon to equip", {"Machine Gun", "Mortar", "Sniper"}, function(selected)
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     local weaponFolder = game:GetService("ReplicatedStorage"):FindFirstChild("Weapons")
@@ -101,6 +105,7 @@ end)
 
 local ModzTab = Window:NewTab("Modz")
 local ModzSection = ModzTab:NewSection("Utilities")
+
 ModzSection:NewToggle("FlyGui", "", function(t)
     if t and not FlyGuiEnabled then
         FlyGuiEnabled = true
@@ -109,7 +114,25 @@ ModzSection:NewToggle("FlyGui", "", function(t)
 end)
 
 ModzSection:NewToggle("GodMode", "", function(t)
-    if t then print("Enable godmode here") end
+    GodModeEnabled = t
+    if t then
+        local function godmode()
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.Name = "GodHumanoid"
+                local clone = humanoid:Clone()
+                humanoid.Parent = nil
+                clone.Parent = LocalPlayer.Character
+            end
+        end
+
+        godmode()
+
+        LocalPlayer.CharacterAdded:Connect(function()
+            task.wait(1)
+            godmode()
+        end)
+    end
 end)
 
 local SettingTab = Window:NewTab("Settings")
@@ -126,18 +149,19 @@ SettingSection:NewTextBox("AutoClicker Key", "1 character only (ex: X)", functio
     if foundKey then AutoClickerKey = foundKey end
 end)
 
+--// FUNCTIONS
 local function IsTeammate(player)
     return player.Team == LocalPlayer.Team
 end
 
 local function IsVisible(targetPart)
     local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin).Unit * 1000
+    local direction = (targetPart.Position - origin)
     local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    return result and result.Instance:IsDescendantOf(targetPart.Parent)
+    local ray = workspace:Raycast(origin, direction, raycastParams)
+    return ray == nil
 end
 
 local function GetClosestPlayer()
@@ -147,8 +171,8 @@ local function GetClosestPlayer()
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             if TeammateCheck and IsTeammate(player) then continue end
             local pos, visible = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            if not visible then continue end
-            local dist = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+            local mousePos = UserInputService:GetMouseLocation()
+            local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
             if dist < shortest then
                 if WallCheck and not IsVisible(player.Character.HumanoidRootPart) then continue end
                 shortest = dist
@@ -159,11 +183,14 @@ local function GetClosestPlayer()
     return closest
 end
 
+local mouse = LocalPlayer:GetMouse()
+
 RunService.RenderStepped:Connect(function()
     if AimbotEnabled and Holding then
         local target = GetClosestPlayer()
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+            local targetPos = target.Character.HumanoidRootPart.Position
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
         end
     end
     if AutoClickerEnabled then
@@ -172,12 +199,11 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-local mouse = LocalPlayer:GetMouse()
 RunService.RenderStepped:Connect(function()
     if TriggerBot and mouse.Target then
         local target = mouse.Target
         local char = target:FindFirstAncestorOfClass("Model")
-        if char and Players:GetPlayerFromCharacter(char) and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+        if char and Players:GetPlayerFromCharacter(char) and char:FindFirstChild("Humanoid") then
             if not TeammateCheck or not IsTeammate(Players:GetPlayerFromCharacter(char)) then
                 mouse1click()
             end
@@ -201,11 +227,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then Holding = false end
 end)
 
--- ESP: Highlight
-local function getCharacter(player)
-    return workspace:FindFirstChild(player.Name)
-end
-
+--// ESP
 local function addHighlightToCharacter(player, character)
     if player == LocalPlayer then return end
     local root = character:FindFirstChild("HumanoidRootPart")
@@ -231,22 +253,12 @@ end
 
 RunService.RenderStepped:Connect(function()
     for _, p in pairs(Players:GetPlayers()) do
-        local char = getCharacter(p)
+        local char = workspace:FindFirstChild(p.Name)
         if char then
             if _G.ESPToggle then addHighlightToCharacter(p, char)
             else removeHighlightFromCharacter(char) end
         end
     end
-end)
-
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function(c)
-        if _G.ESPToggle then addHighlightToCharacter(p, c) end
-    end)
-end)
-
-Players.PlayerRemoving:Connect(function(p)
-    if p.Character then removeHighlightFromCharacter(p.Character) end
 end)
 
 local function addNameESP(player)
@@ -257,7 +269,6 @@ local function addNameESP(player)
         gui.Adornee = root
         gui.Size = UDim2.new(0, 200, 0, 50)
         gui.StudsOffset = Vector3.new(0, 2, 0)
-
         local label = Instance.new("TextLabel", gui)
         label.Text = player.Name
         label.Size = UDim2.new(1, 0, 1, 0)
@@ -287,8 +298,17 @@ end)
 
 Players.PlayerAdded:Connect(function(p)
     p.CharacterAdded:Connect(function()
+        if _G.ESPToggle then addHighlightToCharacter(p, p.Character) end
         if _G.NameESP then addNameESP(p) end
     end)
 end)
 
-Players.PlayerRemoving:Connect(function(p) removeNameESP(p) end)
+Players.PlayerRemoving:Connect(function(p)
+    if p.Character then removeHighlightFromCharacter(p.Character) end
+    removeNameESP(p)
+end)
+
+LocalPlayer.Character:WaitForChild("Humanoid").Died:Connect(function()
+    task.wait(3)
+    LocalPlayer:LoadCharacter()
+end)
