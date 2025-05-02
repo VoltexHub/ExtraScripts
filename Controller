@@ -1,3 +1,4 @@
+-- this is pretty usefel for survial games if you wanna look inside their base or wtv
 -- Sorry, but this is only client-sided. Therefore, you’re the only one who will see these actions.
 
 local Players = game:GetService("Players")
