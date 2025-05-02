@@ -1,0 +1,222 @@
+if getgenv().executed then return end
+getgenv().executed = true
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local AimbotEnabled, TeammateCheck, WallCheck, TriggerBot = false, false, true, false
+local FOV = 200
+local ToggleKey = Enum.KeyCode.RightShift
+local Holding = false
+local HitboxEnabled = false
+local HitboxConnection
+local Orbiting = false
+local OrbitRadius = 220
+local OrbitCenter = Vector3.new(54.49, 5.29, 26.13)
+local characterSelection = "Starlight"
+local selectedHealth = 50
+local checkHealthEnabled = false
+local AutoSelectEnabled = false
+local mobPositions = {
+    ["Starlight"] = Vector3.new(7.36, 338.26, 0.59),
+    ["Roborg"] = Vector3.new(5, 5, 5),
+    ["Jet"] = Vector3.new(5, 5, 5),
+    ["Ms. Crow"] = Vector3.new(5, 5, 5),
+    ["Shifter"] = Vector3.new(5, 5, 5)
+}
+local healPosition = Vector3.new(-20.8036, 338, 23.2531)
+
+_G.ESPToggle = false
+_G.NameESP = false
+_G.HeadSize = 50
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Voltex - " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, "DarkTheme")
+
+local MainTab = Window:NewTab("Main")
+local MainSection = MainTab:NewSection("Aimbot & ESP")
+
+MainSection:NewToggle("Enable Aimbot", "", function(t) AimbotEnabled = t end)
+MainSection:NewToggle("Teammate Check", "", function(t) TeammateCheck = t end)
+MainSection:NewToggle("Wall Check", "", function(t) WallCheck = t end)
+MainSection:NewToggle("TriggerBot", "", function(t) TriggerBot = t end)
+
+MainSection:NewToggle("Name ESP", "", function(t) _G.NameESP = t end)
+MainSection:NewToggle("Highlight ESP", "", function(t) _G.ESPToggle = t end)
+
+local HitboxSection = MainTab:NewSection("Hitboxes")
+HitboxSection:NewToggle("Hitbox Expander", "", function(t)
+    HitboxEnabled = t
+    if t then
+        HitboxConnection = RunService.RenderStepped:Connect(function()
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function()
+                        local hrp = v.Character.HumanoidRootPart
+                        hrp.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
+                        hrp.Transparency = 0.7
+                        hrp.BrickColor = BrickColor.new("Really black")
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
+                    end)
+                end
+            end
+        end)
+    else
+        if HitboxConnection then HitboxConnection:Disconnect() end
+    end
+end)
+HitboxSection:NewSlider("Hitbox Size", "", 10, 50, function(t) _G.HeadSize = t end)
+
+local AutofarmTab = Window:NewTab("Autofarm")
+local AutoSection = AutofarmTab:NewSection("Autofarm")
+
+AutoSection:NewDropdown("Select Mob", "Choose mob to equip on part contact", {"Starlight", "Roborg", "Jet", "Ms. Crow", "Shifter"}, function(choice)
+    characterSelection = choice
+end)
+
+AutoSection:NewToggle("AutoSelect", "Automatically equips selected character on part touch", function(t)
+    AutoSelectEnabled = t
+end)
+
+AutoSection:NewToggle("Autofarm", "Orbit, Aimbot, Triggerbot, Hitboxes", function(t)
+    Orbiting = t
+    AimbotEnabled = t
+    TriggerBot = t
+    HitboxEnabled = t
+end)
+
+AutoSection:NewToggle("If Health < #", "Go to heal position if health is below", function(t)
+    checkHealthEnabled = t
+end)
+AutoSection:NewSlider("Health Threshold", "", 1, 100, function(val)
+    selectedHealth = val
+end)
+
+local function IsTeammate(player)
+    return player.Team == LocalPlayer.Team
+end
+
+local function IsVisible(targetPart)
+    local origin = Camera.CFrame.Position
+    local direction = (targetPart.Position - origin)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local ray = workspace:Raycast(origin, direction, raycastParams)
+    return ray == nil
+end
+
+local function GetClosestPlayer()
+    local closest = nil
+    local shortest = FOV
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if TeammateCheck and IsTeammate(player) then continue end
+            local pos, visible = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            local mousePos = UserInputService:GetMouseLocation()
+            local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+            if dist < shortest then
+                if WallCheck and not IsVisible(player.Character.HumanoidRootPart) then continue end
+                shortest = dist
+                closest = player
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if Orbiting and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local angle = tick() % 360
+        local x = math.cos(angle) * OrbitRadius
+        local z = math.sin(angle) * OrbitRadius
+        LocalPlayer.Character:MoveTo(OrbitCenter + Vector3.new(x, 0, z))
+    end
+    if AimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+        end
+    end
+    if TriggerBot then
+        local mouse = LocalPlayer:GetMouse()
+        local target = mouse.Target
+        if target then
+            local char = target:FindFirstAncestorOfClass("Model")
+            if char and Players:GetPlayerFromCharacter(char) and char:FindFirstChild("Humanoid") then
+                if not TeammateCheck or not IsTeammate(Players:GetPlayerFromCharacter(char)) then
+                    mouse1click()
+                end
+            end
+        end
+    end
+end)
+
+workspace.ChildAdded:Connect(function(child)
+    if AutoSelectEnabled and LocalPlayer.Character and (child.Name == "part1" or child.Name == "part2" or child.Name == "part3") then -- Replace
+        task.wait(0.2)
+        LocalPlayer.Character:MoveTo(mobPositions[characterSelection])
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if checkHealthEnabled and char and char:FindFirstChild("Humanoid") then
+        if char.Humanoid.Health < selectedHealth then
+            char:MoveTo(healPosition)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        local char = workspace:FindFirstChild(p.Name)
+        if char then
+            if _G.ESPToggle then
+                if not char:FindFirstChildOfClass("Highlight") then
+                    local h = Instance.new("Highlight")
+                    h.Adornee = char
+                    h.Parent = char
+                    h.FillColor = Color3.fromRGB(255, 255, 0)
+                    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    h.FillTransparency = 0.5
+                    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                end
+            else
+                local h = char:FindFirstChildOfClass("Highlight")
+                if h then h:Destroy() end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if _G.NameESP and p.Character and not p.Character:FindFirstChildOfClass("BillboardGui") then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local gui = Instance.new("BillboardGui", root)
+                gui.Adornee = root
+                gui.Size = UDim2.new(0, 200, 0, 50)
+                gui.StudsOffset = Vector3.new(0, 2, 0)
+                local label = Instance.new("TextLabel", gui)
+                label.Text = p.Name
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.TextStrokeTransparency = 0.5
+                label.TextSize = 16
+            end
+        elseif not _G.NameESP and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local gui = root:FindFirstChildOfClass("BillboardGui")
+                if gui then gui:Destroy() end
+            end
+        end
+    end
+end)
