@@ -1,0 +1,92 @@
+-- destoy gui doesnt work
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0.25, 0, 0.08, 0)
+frame.Position = UDim2.new(0.01, 0, 0.01, 0)
+frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+frame.BorderSizePixel = 1
+
+local usernameBox = Instance.new("TextBox", frame)
+usernameBox.Size = UDim2.new(0.6, 0, 0.5, 0)
+usernameBox.Position = UDim2.new(0, 0, 0, 0)
+usernameBox.PlaceholderText = "Enter username"
+usernameBox.Font = Enum.Font.SourceSans
+usernameBox.TextSize = 16
+usernameBox.TextColor3 = Color3.new(1, 1, 1)
+usernameBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+usernameBox.BorderSizePixel = 1
+
+local startButton = Instance.new("TextButton", frame)
+startButton.Size = UDim2.new(0.4, 0, 0.5, 0)
+startButton.Position = UDim2.new(0.6, 0, 0, 0)
+startButton.Text = "✔"
+startButton.Font = Enum.Font.SourceSans
+startButton.TextSize = 16
+startButton.TextColor3 = Color3.new(1, 1, 1)
+startButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+startButton.BorderSizePixel = 0
+
+local destroyButton = Instance.new("TextButton", frame)
+destroyButton.Size = UDim2.new(1, 0, 0.5, 0)
+destroyButton.Position = UDim2.new(0, 0, 0.5, 0)
+destroyButton.Text = "❌ Destroy UI"
+destroyButton.Font = Enum.Font.SourceSans
+destroyButton.TextSize = 16
+destroyButton.TextColor3 = Color3.new(1, 1, 1)
+destroyButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+destroyButton.BorderSizePixel = 0
+
+local spectating = false
+local targetChar = nil
+
+local function findPlayer(name)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower() == name:lower() or p.DisplayName:lower() == name:lower() then
+            return p
+        end
+    end
+    return nil
+end
+
+local function updateCamera()
+    if spectating and targetChar then
+        Camera.CameraSubject = targetChar:FindFirstChild("Humanoid")
+        Camera.CFrame = Camera.CFrame:Lerp(targetChar.HumanoidRootPart.CFrame, 0.1)
+    else
+        Camera.CameraSubject = LocalPlayer.Character:FindFirstChild("Humanoid")
+    end
+end
+
+startButton.MouseButton1Click:Connect(function()
+    local name = usernameBox.Text
+    local target = findPlayer(name)
+
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        targetChar = target.Character
+        spectating = true
+        print("Now spectating: " .. target.Name)
+    else
+        print("Player not found. Returning to your character.")
+        spectating = false
+        targetChar = nil
+    end
+end)
+
+destroyButton.MouseButton1Click:Connect(function()
+    spectating = false
+    targetChar = nil
+    print("Stopped spectating. Camera returned to you.")
+end)
+
+RunService.RenderStepped:Connect(function()
+    updateCamera()
+end)
