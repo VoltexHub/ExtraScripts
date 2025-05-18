@@ -1,0 +1,6 @@
+local InputM = game:GetService("VirtualInputManager")
+
+while true do
+    task.wait(0.1)
+    InputM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+end
