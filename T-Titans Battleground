@@ -1,7 +1,7 @@
 local TouchService = game:GetService("TouchInputService")
 
-if TouchService.Enabled then -- https://pastebin.com/WsjqWucK
-	print("Mobile")
+if TouchService.Enabled then
+	loadstring(game:HttpGet("https://pastebin.com/raw/WsjqWucK"))()
 else
-	print("Pc") -- https://pastebin.com/vD6eXahT
+	loadstring(game:HttpGet("https://pastebin.com/raw/vD6eXahT"))()
 end
