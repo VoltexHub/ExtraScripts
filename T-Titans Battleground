@@ -3,5 +3,5 @@ local TouchService = game:GetService("TouchInputService")
 if TouchService.Enabled then
 	loadstring(game:HttpGet("https://pastebin.com/raw/WsjqWucK"))()
 else
-	loadstring(game:HttpGet("https://pastebin.com/raw/vD6eXahT"))()
+	loadstring(game:HttpGet("https://pastebin.com/raw/WsjqWucK"))() -- change me! --loadstring(game:HttpGet("https://pastebin.com/raw/vD6eXahT"))()
 end
