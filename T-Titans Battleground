@@ -2,8 +2,8 @@
 
 local UserInputService = game:GetService("UserInputService")
 
-if UserInputService.TouchEnabled then
-    loadstring(game:HttpGet("https://pastebin.com/raw/WsjqWucK"))()
-else
-    loadstring(game:HttpGet("https://pastebin.com/raw/WsjqWucK"))() -- loadstring(game:HttpGet("https://pastebin.com/raw/vD6eXahT"))()
-end
+local mobileURL = "https://pastebin.com/raw/WsjqWucK"
+local pcURL = "https://pastebin.com/raw/WsjqWucK" -- "https://pastebin.com/raw/vD6eXahT"
+
+local url = UserInputService.TouchEnabled and mobileURL or pcURL
+loadstring(game:HttpGet(url))()
