@@ -1,3 +1,5 @@
+-- loadstring(game:HttpGet("https://github.com/VoltexHub/ExtraScripts/blob/main/T-Titans%20Battleground"))()
+
 local UserInputService = game:GetService("UserInputService")
 
 if UserInputService.TouchEnabled then
