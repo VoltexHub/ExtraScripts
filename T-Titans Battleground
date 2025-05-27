@@ -1,4 +1,4 @@
--- loadstring(game:HttpGet("https://github.com/VoltexHub/ExtraScripts/blob/main/T-Titans%20Battleground"))()
+-- loadstring(game:HttpGet("https://github.com/VoltexHub/ExtraScripts/raw/main/T-Titans%20Battleground"))()
 
 local UserInputService = game:GetService("UserInputService")
 
