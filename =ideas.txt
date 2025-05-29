@@ -1,3 +1,6 @@
 Freeze Script -- just a part that goes to a player
 AntiCheat -- for roblox studio, i alr have a decent script
-Other Exploit detectors -- probbaly just checking for abornal behavoirs or guis
+Other Exploit detectors -- probbaly just checking for abornal behavoirs or guisLlag switch -- you know
+Fake chat -- makes other people say stuff
+Lag Switch -- yk
+Metatable Hooking -- hooking __index, __namecall, or __newindex
