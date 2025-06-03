@@ -1,0 +1,55 @@
+local StarterGui = game:GetService("StarterGui")
+
+local allowedWebhooks = {
+    ["https://discord.com/api/webhooks/1379558092471140382/yUum1AIZps7R94U2EOvVt_kImzYIvnjUAuxsQU489M_HzmyytTALeUUWwnBVJDcVHJyx"] = true,
+    ["https://discord.com/api/webhooks/1376413737627684956/zKfVNZyiIJVRsyJLwslRLP-6ksHdvH9MlBFyPKdoG53e1gTdu5J8IZy0n9UhB6doq7vJ"] = true,
+    ["https://discord.com/api/webhooks/1376791899356270662/6pOAFIVJkXl3hf5kvDqMy0ljhMckYTkcLX3scgAsfgZm_E2JG7vBDcZR90NZixc4RKR8"] = true
+}
+
+local function notify(title, msg)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = msg,
+            Duration = 8
+        })
+    end)
+end
+
+local function preview(text)
+    return text:gsub("\n", "\\n"):sub(1, 150) .. (text:len() > 150 and "..." or "")
+end
+
+_G.loadstring = function(code)
+    local webhook = code:match("https://discord%.com/api/webhooks/%d+/%S+")
+    if webhook and not allowedWebhooks[webhook] then
+        notify("Webhook detected", "Blocked execution.\n" .. preview(code))
+        warn("Blocked webhook in script:\n" .. webhook .. "\nContent:\n" .. preview(code))
+        return function() warn("Execution blocked.") end
+    end
+    return loadstring(code)
+end
+
+local originalRequest = (http and http.request) or (syn and syn.request) or request
+if originalRequest then
+    local function safeRequest(data)
+        local url = data.Url or ""
+        if url:match("discord%.com/api/webhooks") and not allowedWebhooks[url] then
+            local content = typeof(data.Body) == "string" and data.Body or "[No Body]"
+            notify("Webhook Blocked", preview(content))
+            warn("Blocked webhook to: " .. url .. "\nWith content:\n" .. preview(content))
+            return { Success = false, StatusCode = 403, Body = "Webhook Blocked" }
+        end
+        return originalRequest(data)
+    end
+
+    if http then
+        http.request = safeRequest
+    elseif syn then
+        syn.request = safeRequest
+    else
+        request = safeRequest
+    end
+end
+
+notify("Anti-Webhook Enabled", "Monitoring scripts")
