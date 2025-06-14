@@ -1,9 +1,0 @@
--- loadstring(game:HttpGet("https://github.com/VoltexHub/ExtraScripts/raw/main/T-Titans%20Battleground"))()
-
-local UserInputService = game:GetService("UserInputService")
-
-local mobileURL = "https://pastebin.com/raw/WsjqWucK"
-local pcURL = "https://pastebin.com/raw/WsjqWucK" -- "https://pastebin.com/raw/vD6eXahT"
-
-local url = UserInputService.TouchEnabled and mobileURL or pcURL
-loadstring(game:HttpGet(url))()
