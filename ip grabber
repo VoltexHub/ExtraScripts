@@ -1,0 +1,21 @@
+local drawing = Drawing.new("Text")
+drawing.Position = Vector2.new(50, 50)
+drawing.Size = 18
+drawing.Color = Color3.fromRGB(255, 255, 255)
+drawing.Outline = true
+drawing.Visible = true
+
+local Stats = game:GetService("Stats")
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    local fps = math.floor(Stats.Workspace.Heartbeat:GetValue())
+    local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    drawing.Text = string.format("Frames: %d | Ping: %d ms", fps, ping)
+end)
+
+
+--[[
+if Enum.KeyCode.F then
+	drawing:Remove()
+end 
+--]]
