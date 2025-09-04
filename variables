@@ -1,0 +1,4 @@
+loadstring(game:HttpGet("https://github.com/VoltexHub/website/raw/main/scripts/variables.lua"))()
+
+print(_G.Players)
+print(_G.ReplicatedStorage) 
